@@ -6,10 +6,18 @@
 #include <string.h>
 #include "funciones.h"
 
+typedef struct {
+	pthread_t tid;
+	long int total_read;
+	long int total_matched;
+	long int total_no_matched;
+	FILE *fp_input;
+} cpthread_t;
+
 regex_t re;
 list_t *results;
 params_t params;
-pthread_t *tid;
+cpthread_t **threads;
 pthread_mutex_t read_lock;
 pthread_mutex_t write_lock;
 int processed_lines;
@@ -18,21 +26,28 @@ void *main_thread(void *arg)
 {
 	char line_buffer[4096];
 	int chunk_counter = 0;
-	FILE *fp_input = (FILE*)arg;
+	cpthread_t *thread = (cpthread_t*)arg;
 	list_t *tmp_lines = list_create();
 	int match_status;
 
-	while(!feof(fp_input)){
+	while(!feof(thread->fp_input)){
 		// TODO: read N lines
 		pthread_mutex_lock(&read_lock);
 		chunk_counter = 0;
-		while (fgets(line_buffer, sizeof(line_buffer), fp_input) != NULL) {
+		while (fgets(line_buffer, sizeof(line_buffer), thread->fp_input) != NULL) {
 			processed_lines += 1;
+			thread->total_read += 1;
 			if(str_endswith(line_buffer, "\n")) strtrim(line_buffer);
 
 			match_status = regexec(&re, line_buffer, (size_t)0, NULL, 0);
-			if (match_status == 0) strcat(line_buffer, " si");
-			else strcat(line_buffer, " no");
+			if (match_status == 0){
+				strcat(line_buffer, " si");
+				thread->total_matched += 1;
+			}
+			else{
+				strcat(line_buffer, " no");
+				thread->total_no_matched += 1;
+			}
 			list_add(tmp_lines, line_buffer);
 
 			chunk_counter += 1;
@@ -121,9 +136,14 @@ int main(int argc, char *argv[])
 	}
 
 	int i, error;
-	tid = (pthread_t*)malloc(sizeof(pthread_t) * params.total_workers);
+	threads = (cpthread_t**)malloc(sizeof(cpthread_t*) * params.total_workers);
 	for(i = 0; i < params.total_workers; ++i){
-        error = pthread_create(&(tid[i]), NULL, &main_thread, (void*)fp_input);
+		threads[i] = (cpthread_t*)malloc(sizeof(cpthread_t));
+		threads[i]->total_read = 0;
+		threads[i]->total_matched = 0;
+		threads[i]->total_no_matched = 0;
+		threads[i]->fp_input = fp_input;
+        error = pthread_create(&(threads[i]->tid), NULL, &main_thread, (void*)threads[i]);
         if (error != 0){
 			fprintf(stderr, "Error: No se pudo inicializar la hebra!\n");
 			fclose(fp_input);
@@ -132,13 +152,12 @@ int main(int argc, char *argv[])
 	}
 
 	for(i = 0; i < params.total_workers; ++i){
-		pthread_join(tid[i], NULL);
+		pthread_join(threads[i]->tid, NULL);
 	}
 
 	fclose(fp_input);
     pthread_mutex_destroy(&read_lock);
     pthread_mutex_destroy(&write_lock);
-	free(tid);
 
 	// TODO
 	if((fp_output = fopen(params.file_out, "w")) == NULL){
@@ -163,6 +182,22 @@ int main(int argc, char *argv[])
 	dup_printf(params.flag_verbose, fp_output, "Total de lineas procesadas:%d\n", processed_lines);
 
 	// TODO: print read/write by thread
+	char line_buffer[4096];
+	sprintf(line_buffer, "%d", params.total_workers);
+	int zeropad = strlen(line_buffer);
+	if(zeropad < 2) zeropad = 2;
+	for(i = 0; i < params.total_workers; ++i){
+		dup_printf(params.flag_verbose, fp_output,
+			"[Thread #%0*d] Total de expresiones leídas:%d\n",
+			zeropad, i+1, threads[i]->total_read
+		);
+		dup_printf(params.flag_verbose, fp_output,
+			"[Thread #%0*d] Total de expresiones procesadas:%d\n",
+			zeropad, i+1, threads[i]->total_read
+		);
+		free(threads[i]);
+	}
+	free(threads);
 
 	list_destroy(results);
 	return 0;
