@@ -124,18 +124,22 @@ char *strtrim(char *s) {
     return s;
 };
 
-// Descripción: Estructura nodo para lista enlazada.
+// Descripción: Estructura nodo para lista enlazada (lista de strings).
 typedef struct __node {
 	char *value;
 	struct __node *next;
 } node_t;
 
+// Descripción: Estructura de lista enlazada.
 typedef struct {
 	node_t *head;
 	node_t *tail;
 	node_t *curr;
 } list_t;
 
+// Entradas:    No hay.
+// Salidas:     Una referencia a una nueva lista en memoria.
+// Descripción: Crear una nueva instancia de lista en memoria.
 list_t *list_create()
 {
 	list_t *list = (list_t*)malloc(sizeof(list_t));
@@ -146,12 +150,19 @@ list_t *list_create()
 	return list;
 };
 
+// Entradas:    Referencia a una lista.
+// Salidas:     Un nodo perteneciente a la lista o NULL.
+// Descripción: Coloca el puntero para iterar al inicio de la lista.
 node_t *list_iter_start(list_t *list)
 {
 	list->curr = list->head;
 	return list->curr;
 };
 
+// Entradas:    Referencia a una lista.
+// Salidas:     Un nodo perteneciente a la lista o NULL.
+// Descripción: Obtiene el nodo al que apunta actualmente el puntero
+//              para iterar y ademas lo actualiza al siguiente elemento.
 node_t *list_iter_next(list_t *list)
 {
 	node_t *curr = list->curr;
@@ -161,6 +172,10 @@ node_t *list_iter_next(list_t *list)
 	return curr;
 };
 
+// Entradas:    Referencia a una lista.
+// Salidas:     Un nodo perteneciente a la lista o NULL.
+// Descripción: Agrega un string a la lista, retorna el nuevo nodo si se
+//              pudo crear correctamente o NULL en caso contrario.
 node_t *list_add(list_t *list, char *value)
 {
 	node_t *node = (node_t*)malloc(sizeof(node_t));
@@ -179,6 +194,9 @@ node_t *list_add(list_t *list, char *value)
 	return node;
 };
 
+// Entradas:    Referencia a una lista.
+// Salidas:     Nada.
+// Descripción: Elimina todos los nodos de una lista de la memoria.
 void list_empty(list_t *list)
 {
 	if(list->head != NULL) {
@@ -196,6 +214,10 @@ void list_empty(list_t *list)
 	list->curr = NULL;
 };
 
+// Entradas:    Referencia a una lista.
+// Salidas:     Nada.
+// Descripción: Elimina todos los nodos de una lista de la memoria junto
+//              con la lista misma.
 void list_destroy(list_t *list)
 {
 	list_empty(list);
